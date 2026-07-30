@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SHAMAN CHOOZ PRODUCTION - Paiement</title>
+<meta name="theme-color" content="#2f7bf0">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-32.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --blue:#2f7bf0;--blue-dark:#1e5fce;--bg:#f4f7fd;--card:#ffffff;--green:#1fb884;
+  --yellow:#f0b429;--text:#1c2333;--muted:#6b7686;--radius:16px;
+  --shadow:0 2px 10px rgba(20,40,90,.06);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+#app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;}
+header.topbar{display:flex;align-items:center;gap:14px;padding:16px 18px 20px;
+  background:linear-gradient(180deg,#eaf1ff,#f4f7fd);}
+.avatar-btn{border:none;background:none;padding:0;cursor:pointer;flex-shrink:0;}
+.avatar-btn img{width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid var(--yellow);display:block;}
+.brand-name{font-size:1.05rem;font-weight:800;color:var(--blue);line-height:1.15;}
+.brand-sub{font-size:.72rem;letter-spacing:.05em;color:var(--muted);font-weight:600;text-transform:uppercase;margin-top:2px;}
+#photo-overlay{position:fixed;inset:0;background:rgba(10,14,25,.92);display:none;align-items:center;justify-content:center;z-index:999;cursor:pointer;}
+#photo-overlay.open{display:flex;}
+#photo-overlay img{max-width:88vw;max-height:80vh;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+main{flex:1;padding:0 16px 90px;}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:16px;}
+.card h3{margin:0 0 14px;color:var(--blue);font-size:1.02rem;}
+.origin-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.origin-opt{border:2px solid #dbe6fb;border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer;background:#f7faff;font-weight:700;}
+.origin-opt small{display:block;font-weight:600;color:var(--muted);margin-top:2px;}
+.origin-opt.selected{border-color:var(--green);background:#eafbf4;color:var(--green);}
+.amount-box{border:2px solid var(--yellow);border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.amount-box input{border:none;background:none;font-size:1.8rem;font-weight:800;width:60%;color:var(--text);}
+.amount-box input:focus{outline:none;}
+.amount-box span{color:#8a6d1a;font-weight:700;}
+.hint{color:var(--muted);font-size:.82rem;text-align:center;margin-bottom:12px;}
+.quick-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.quick-btn{background:#eef3fd;border:none;border-radius:10px;padding:12px 4px;font-weight:700;color:var(--blue-dark);cursor:pointer;}
+.quick-btn.active{background:var(--blue);color:#fff;}
+.op-row{display:flex;align-items:center;gap:14px;border:2px solid #e7edf9;border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer;}
+.op-row.selected{border-color:var(--blue);background:#f2f7ff;}
+.op-badge{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:.85rem;flex-shrink:0;}
+.op-info b{display:block;font-size:.95rem;}
+.op-info span{font-size:.8rem;color:var(--muted);}
+.op-radio{margin-left:auto;width:20px;height:20px;border-radius:50%;border:2px solid #cdd7ea;}
+.op-row.selected .op-radio{border-color:var(--blue);background:radial-gradient(var(--blue) 45%,transparent 50%);}
+.phone-row{display:flex;gap:10px;}
+.code-box{border:2px solid var(--yellow);border-radius:10px;padding:12px 14px;font-weight:800;background:#fff9ea;}
+.phone-row input{flex:1;border:2px solid #e7edf9;border-radius:10px;padding:12px 14px;font-size:1.05rem;}
+.phone-row input:focus{outline:none;border-color:var(--blue);}
+.sum-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eef1f7;font-size:.92rem;}
+.sum-row:last-child{border-bottom:none;}
+.sum-row b{font-weight:700;}
+.sum-total{font-size:1.3rem;color:#a8760f;}
+button.btn{width:100%;border:none;border-radius:12px;padding:16px;font-weight:800;font-size:1rem;cursor:pointer;margin-top:6px;}
+.btn-primary{background:var(--yellow);color:#4a3400;}
+.btn-primary:disabled{background:#e6e6e6;color:#9a9a9a;cursor:not-allowed;}
+.btn-ghost{background:#eef3fd;color:var(--blue-dark);}
+.btn-success{background:var(--green);color:#fff;}
+.modal-backdrop{position:fixed;inset:0;background:rgba(10,14,25,.55);display:none;align-items:flex-end;justify-content:center;z-index:900;}
+.modal-backdrop.open{display:flex;}
+.modal-sheet{background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 30px;width:100%;max-width:520px;max-height:90vh;overflow:auto;}
+.modal-sheet h2{text-align:center;margin-top:0;}
+.instructions{background:#fff8e6;border-radius:12px;padding:16px;margin:16px 0;font-size:.92rem;line-height:1.7;}
+.confirm-banner{background:#eafbf4;border:2px solid var(--green);border-radius:12px;padding:14px 16px;margin-bottom:14px;color:#0d6b4d;font-weight:700;font-size:.92rem;}
+.qr-wrap{text-align:center;}
+#qr-canvas{margin:10px auto;display:flex;justify-content:center;}
+.share-link{word-break:break-all;background:#f2f5fb;border-radius:8px;padding:10px;font-size:.82rem;color:var(--blue-dark);margin-top:10px;}
+.intl-list{font-size:.88rem;line-height:1.7;margin:0;padding-left:18px;}
+#offline-badge{display:none;position:sticky;top:0;z-index:50;background:#3a3f4b;color:#fff;text-align:center;font-size:.8rem;padding:6px;}
+#offline-badge.show{display:block;}
+nav.tabbar{display:flex;background:#fff;border-top:1px solid #eef1f7;position:sticky;bottom:0;}
+nav.tabbar button{flex:1;border:none;background:none;padding:12px 4px;font-size:.78rem;font-weight:700;color:var(--muted);}
+nav.tabbar button.active{color:var(--blue);border-top:3px solid var(--blue);}
+.hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div id="offline-badge">📴 Vous êtes hors-ligne — vos paiements seront enregistrés dès le retour du réseau</div>
+<div id="app">
+
+  <header class="topbar">
+    <button id="avatar-btn" class="avatar-btn" aria-label="Voir la photo en plein écran">
+      <img src="icon-192.png" alt="Photo du prestataire">
+    </button>
+    <div>
+      <div class="brand-name">SHAMAN CHOOZ PRODUCTION</div>
+      <div class="brand-sub">Prestations de services &bull; +300 métiers</div>
+    </div>
+  </header>
+
+  <main>
+    <section id="panel-paiement" class="panel">
+
+      <div class="card">
+        <h3>Choisir votre méthode de paiement</h3>
+        <div class="origin-grid">
+          <div class="origin-opt" data-origin="ci">🇨🇮 Côte d'Ivoire<small>Mobile Money</small></div>
+          <div class="origin-opt" data-origin="intl">🌍 International<small>Depuis l'étranger</small></div>
+        </div>
+        <div id="intl-note" class="hidden" style="margin-top:14px;">
+          <p class="hint" style="margin-bottom:8px;">Envoyez depuis l'étranger via l'un de ces services, directement vers l'un des numéros Mobile Money ci-dessous : l'argent est retirable aussitôt en Côte d'Ivoire.</p>
+          <ul class="intl-list">
+            <li><b>WorldRemit</b> — dépôt direct sur Mobile Money (Orange/MTN/Moov/Wave)</li>
+            <li><b>Wave (international)</b> — depuis la France, l'Europe ou les USA vers Wave CI</li>
+            <li><b>Taptap Send</b> — dépôt direct sur Mobile Money, frais réduits</li>
+            <li><b>Sendwave</b> — transfert direct vers Mobile Money</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>1. Montant à payer</h3>
+        <div class="amount-box">
+          <input id="montant-input" type="text" inputmode="numeric" value="5000">
+          <span>F CFA</span>
+        </div>
+        <p class="hint">Entre 1 000 et 50 000 F CFA</p>
+        <div class="quick-grid">
+          <button class="quick-btn" data-val="1000">1 000 F</button>
+          <button class="quick-btn" data-val="2500">2 500 F</button>
+          <button class="quick-btn" data-val="5000">5 000 F</button>
+          <button class="quick-btn" data-val="10000">10 000 F</button>
+          <button class="quick-btn" data-val="25000">25 000 F</button>
+          <button class="quick-btn" data-val="50000">50 000 F</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>2. Choisir votre opérateur</h3>
+        <div id="op-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>3. Votre numéro Mobile Money</h3>
+        <div class="phone-row">
+          <div class="code-box">+225</div>
+          <input id="numero-input" type="tel" placeholder="07 00 00 00 00" maxlength="10">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Résumé</h3>
+        <div class="sum-row"><span>Bénéficiaire</span><b>SHAMAN CHOOZ PRODUCTION</b></div>
+        <div class="sum-row"><span>Opérateur</span><b id="sum-operateur">--</b></div>
+        <div class="sum-row"><span>Votre numéro</span><b id="sum-numero">--</b></div>
+        <div class="sum-row"><span>Montant</span><b id="sum-montant" class="sum-total">0 F</b></div>
+      </div>
+
+      <div id="confirm-banner" class="confirm-banner hidden"></div>
+
+      <button id="btn-instructions" class="btn btn-primary" disabled>Voir les instructions de paiement</button>
+
+      <div id="bloc-reference" class="card hidden" style="border:2px solid var(--green);">
+        <h3 style="color:var(--green);">Entrez votre référence de transaction</h3>
+        <p class="hint" style="text-align:left;">Après le paiement, votre opérateur vous envoie un SMS de confirmation avec une référence. Entrez-la ici :</p>
+        <div class="phone-row" style="margin-bottom:14px;">
+          <input id="reference-input" type="text" placeholder="ENTREZ LA RÉFÉRENCE SMS">
+        </div>
+        <button id="btn-valider-paiement" class="btn btn-success">Valider mon paiement</button>
+      </div>
+    </section>
+
+    <section id="panel-partage" class="panel hidden">
+      <div class="card qr-wrap">
+        <h3>Partager mon lien de paiement</h3>
+        <div id="qr-canvas"></div>
+        <p class="hint">Imprimez ce QR code ou partagez le lien ci-dessous par WhatsApp, réseaux sociaux ou SMS.</p>
+        <div id="share-url" class="share-link"></div>
+      </div>
+      <div class="card">
+        <h3>📲 Installer l'application</h3>
+        <p style="font-size:.9rem;line-height:1.6;">
+          Sur Android (Chrome) : menu ⋮ → "Ajouter à l'écran d'accueil".<br>
+          Sur iPhone (Safari) : bouton Partager → "Sur l'écran d'accueil".<br>
+          Une fois installée, l'app s'ouvre même sans connexion internet pour préparer un paiement.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <div id="photo-overlay">
+    <img src="icon-512.png" alt="Photo en plein écran">
+  </div>
+
+  <div id="modal-instructions" class="modal-backdrop">
+    <div class="modal-sheet">
+      <h2>Instructions de paiement</h2>
+      <div class="sum-row"><span>Opérateur</span><b id="instr-operateur"></b></div>
+      <div class="sum-row"><span>Numéro à payer</span><b id="instr-numero"></b></div>
+      <div class="sum-row"><span>Votre numéro payeur</span><b id="instr-payeur"></b></div>
+      <div class="sum-row"><span>Montant</span><b id="instr-montant"></b></div>
+      <div id="instr-steps" class="instructions"></div>
+      <button id="btn-jai-paye" class="btn btn-success">✅ J'ai effectué le paiement</button>
+      <button id="btn-fermer-modal" class="btn btn-ghost">Annuler</button>
+    </div>
+  </div>
+
+  <nav class="tabbar">
+    <button class="active" data-panel="panel-paiement">💳 Paiement</button>
+    <button data-panel="panel-partage">🔗 Partager / QR</button>
+  </nav>
+</div>
+
+<script type="module">
+// ============================================================
+// CONFIGURATION FIREBASE
+// Remplacez les valeurs ci-dessous par celles de VOTRE projet
+// Firebase (Console Firebase > Paramètres du projet > Vos apps
+// > Config SDK). Tant que ce n'est pas rempli, l'app fonctionne
+// quand même : les paiements sont gardés sur l'appareil du client
+// (mode local), mais pas encore synchronisés dans le cloud.
+// ============================================================
+const firebaseConfig = {
+  apiKey: "REMPLACER_API_KEY",
+  authDomain: "REMPLACER.firebaseapp.com",
+  projectId: "REMPLACER_PROJECT_ID",
+  storageBucket: "REMPLACER.appspot.com",
+  messagingSenderId: "REMPLACER_SENDER_ID",
+  appId: "REMPLACER_APP_ID"
+};
+
+let dbApi = null;
+let firebaseReady = false;
+
+async function initFirebase() {
+  const isPlaceholder = Object.values(firebaseConfig).some(v => String(v).startsWith("REMPLACER"));
+  if (isPlaceholder) { console.warn("[SHAMAN] Firebase non configuré : mode local uniquement."); return; }
+  try {
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const { getFirestore, collection, addDoc, serverTimestamp, enableIndexedDbPersistence } =
+      await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    try { await enableIndexedDbPersistence(db); } catch (e) { console.warn("[SHAMAN] Persistance non activée:", e.code); }
+    dbApi = { collection, addDoc, serverTimestamp, db };
+    firebaseReady = true;
+  } catch (e) { console.error("[SHAMAN] Erreur Firebase:", e); }
+}
+
+async function enregistrerPaiement(paiement) {
+  if (firebaseReady && dbApi) {
+    try {
+      await dbApi.addDoc(dbApi.collection(dbApi.db, "paiements"), { ...paiement, createdAt: dbApi.serverTimestamp() });
+      return { ok: true, mode: "firebase" };
+    } catch (e) {
+      console.warn("[SHAMAN] Écriture mise en file (hors-ligne):", e);
+      return { ok: true, mode: "firebase-queued" };
+    }
+  }
+  const key = "shaman_paiements_locaux";
+  const queue = JSON.parse(localStorage.getItem(key) || "[]");
+  queue.push({ ...paiement, dateLocale: new Date().toISOString() });
+  localStorage.setItem(key, JSON.stringify(queue));
+  return { ok: true, mode: "local" };
+}
+
+// ---- Données de l'agence ----------------------------------
+const BENEFICIAIRE = "SHAMAN CHOOZ PRODUCTION";
+const OPERATEURS = [
+  { id: "wave",   nom: "Wave",             numero: "07 48 93 56 86", color: "#1aa6e0", initiales: "W"  },
+  { id: "mtn",    nom: "MTN Mobile Money", numero: "05 74 53 36 36", color: "#f2c200", initiales: "M"  },
+  { id: "moov",   nom: "Moov Money",       numero: "01 73 77 39 39", color: "#1c3fae", initiales: "MV" },
+  { id: "orange", nom: "Orange Money",     numero: "07 49 97 09 18", color: "#f26a1f", initiales: "OM" }
+];
+
+const state = { origine: "ci", montant: 5000, operateurId: null, numeroPayeur: "", reference: "" };
+
+function renderOperateurs() {
+  const wrap = document.getElementById("op-list");
+  wrap.innerHTML = OPERATEURS.map(op => `
+    <div class="op-row ${state.operateurId === op.id ? 'selected' : ''}" data-op="${op.id}">
+      <div class="op-badge" style="background:${op.color}">${op.initiales}</div>
+      <div class="op-info"><b>${op.nom}</b><span>${state.origine === 'ci' ? 'Payer au' : 'Recevoir sur'} : ${op.numero}</span></div>
+      <div class="op-radio"></div>
+    </div>`).join("");
+  wrap.querySelectorAll(".op-row").forEach(row => {
+    row.addEventListener("click", () => { state.operateurId = row.dataset.op; renderOperateurs(); updateSummary(); });
+  });
+}
+function operateurActuel() { return OPERATEURS.find(o => o.id === state.operateurId) || null; }
+
+function renderOrigine() {
+  document.querySelectorAll(".origin-opt").forEach(el => el.classList.toggle("selected", el.dataset.origin === state.origine));
+  document.getElementById("intl-note").classList.toggle("hidden", state.origine !== "intl");
+}
+
+function setMontant(val) {
+  state.montant = val;
+  document.getElementById("montant-input").value = val;
+  document.querySelectorAll(".quick-btn").forEach(b => b.classList.toggle("active", Number(b.dataset.val) === val));
+  updateSummary();
+}
+
+function updateSummary() {
+  const op = operateurActuel();
+  document.getElementById("sum-operateur").textContent = op ? op.nom : "--";
+  document.getElementById("sum-numero").textContent = state.numeroPayeur ? `+225 ${state.numeroPayeur}` : "--";
+  document.getElementById("sum-montant").textContent = `${Number(state.montant || 0).toLocaleString("fr-FR")} F`;
+  const pret = !!op && Number(state.montant) > 0 && state.numeroPayeur.length >= 8;
+  document.getElementById("btn-instructions").disabled = !pret;
+}
+
+function ouvrirInstructions() {
+  const op = operateurActuel();
+  if (!op) return;
+  document.getElementById("instr-operateur").textContent = op.nom;
+  document.getElementById("instr-numero").textContent = op.numero;
+  document.getElementById("instr-payeur").textContent = `+225 ${state.numeroPayeur}`;
+  document.getElementById("instr-montant").textContent = `${Number(state.montant).toLocaleString("fr-FR")} F CFA`;
+  document.getElementById("instr-steps").innerHTML = `
+    1. Ouvrez votre application ${op.nom}<br>
+    2. Choisissez "Envoyer de l'argent"<br>
+    3. Entrez le numéro : <b>${op.numero}</b><br>
+    4. Entrez le montant : <b>${Number(state.montant).toLocaleString("fr-FR")} F CFA</b><br>
+    5. Confirmez, puis notez la référence reçue par SMS`;
+  document.getElementById("modal-instructions").classList.add("open");
+}
+function fermerInstructions() { document.getElementById("modal-instructions").classList.remove("open"); }
+function jaiPayeClick() {
+  fermerInstructions();
+  document.getElementById("bloc-reference").classList.remove("hidden");
+  document.getElementById("btn-instructions").classList.add("hidden");
+}
+
+async function validerPaiement() {
+  const ref = document.getElementById("reference-input").value.trim();
+  if (!ref) { alert("Merci d'entrer la référence reçue par SMS."); return; }
+  const op = operateurActuel();
+  const btn = document.getElementById("btn-valider-paiement");
+  btn.disabled = true; btn.textContent = "Enregistrement...";
+  const resultat = await enregistrerPaiement({
+    beneficiaire: BENEFICIAIRE, origine: state.origine, operateur: op.nom,
+    numeroPayeur: `+225${state.numeroPayeur}`, montant: Number(state.montant), reference: ref
+  });
+  document.getElementById("bloc-reference").classList.add("hidden");
+  const banner = document.getElementById("confirm-banner");
+  banner.classList.remove("hidden");
+  banner.textContent = (resultat.mode === "local" || resultat.mode === "firebase-queued")
+    ? `✅ Paiement enregistré (${Number(state.montant).toLocaleString("fr-FR")} F CFA via ${op.nom}, réf: ${ref}). Il sera synchronisé dès que vous serez en ligne.`
+    : `✅ Paiement confirmé : ${Number(state.montant).toLocaleString("fr-FR")} F CFA via ${op.nom} (réf: ${ref}).`;
+}
+
+function setupPhoto() {
+  const btn = document.getElementById("avatar-btn");
+  const overlay = document.getElementById("photo-overlay");
+  btn.addEventListener("click", () => overlay.classList.add("open"));
+  overlay.addEventListener("click", () => overlay.classList.remove("open"));
+}
+
+function setupPartage() {
+  const url = window.location.href.split("#")[0];
+  document.getElementById("share-url").textContent = url;
+  new QRCode(document.getElementById("qr-canvas"), { text: url, width: 200, height: 200, colorDark: "#1c2333", colorLight: "#ffffff" });
+}
+
+function setupReseau() {
+  const badge = document.getElementById("offline-badge");
+  const maj = () => badge.classList.toggle("show", !navigator.onLine);
+  window.addEventListener("online", maj);
+  window.addEventListener("offline", maj);
+  maj();
+}
+
+function setupTabs() {
+  const tabs = document.querySelectorAll("nav.tabbar button");
+  const panels = document.querySelectorAll(".panel");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("active"));
+      panels.forEach(p => p.classList.add("hidden"));
+      tab.classList.add("active");
+      document.getElementById(tab.dataset.panel).classList.remove("hidden");
+    });
+  });
+}
+
+function init() {
+  setupPhoto(); setupReseau(); setupTabs(); setupPartage();
+  renderOrigine(); renderOperateurs(); setMontant(state.montant); updateSummary();
+
+  document.querySelectorAll(".origin-opt").forEach(el => {
+    el.addEventListener("click", () => { state.origine = el.dataset.origin; state.operateurId = null; renderOrigine(); renderOperateurs(); updateSummary(); });
+  });
+  document.querySelectorAll(".quick-btn").forEach(b => b.addEventListener("click", () => setMontant(Number(b.dataset.val))));
+  document.getElementById("montant-input").addEventListener("input", e => setMontant(Number(e.target.value.replace(/\D/g, "")) || 0));
+  document.getElementById("numero-input").addEventListener("input", e => { state.numeroPayeur = e.target.value.replace(/\D/g, ""); updateSummary(); });
+  document.getElementById("btn-instructions").addEventListener("click", ouvrirInstructions);
+  document.getElementById("btn-fermer-modal").addEventListener("click", fermerInstructions);
+  document.getElementById("btn-jai-paye").addEventListener("click", jaiPayeClick);
+  document.getElementById("btn-valider-paiement").addEventListener("click", validerPaiement);
+
+  initFirebase();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(console.error);
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
