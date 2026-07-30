@@ -79,6 +79,19 @@ nav.tabbar{display:flex;background:#fff;border-top:1px solid #eef1f7;position:st
 nav.tabbar button{flex:1;border:none;background:none;padding:12px 4px;font-size:.78rem;font-weight:700;color:var(--muted);}
 nav.tabbar button.active{color:var(--blue);border-top:3px solid var(--blue);}
 .hidden{display:none !important;}
+.login-field{display:flex;align-items:center;gap:8px;border:2px solid #e7edf9;border-radius:10px;
+  padding:10px 12px;margin-bottom:12px;background:#fbfcfe;}
+.login-field .lock-ico{font-size:1.1rem;flex-shrink:0;}
+.login-field input{flex:1;border:none;background:none;font-size:1rem;color:var(--text);}
+.login-field input:focus{outline:none;}
+.login-field button.eye-btn{border:none;background:none;font-size:1.1rem;cursor:pointer;padding:0;}
+.login-error{color:#c23b3b;font-size:.85rem;margin:-4px 0 10px;text-align:center;}
+.paiement-item{border:1px solid #eef1f7;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:.88rem;}
+.paiement-item .pi-top{display:flex;justify-content:space-between;font-weight:800;color:var(--blue-dark);margin-bottom:4px;}
+.paiement-item .pi-row{display:flex;justify-content:space-between;color:var(--muted);padding:2px 0;}
+.paiement-item .pi-row b{color:var(--text);font-weight:600;}
+.admin-header{display:flex;justify-content:space-between;align-items:center;}
+.admin-header button{background:#fdeaea;color:#c23b3b;border:none;border-radius:8px;padding:8px 12px;font-weight:700;font-size:.82rem;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -183,6 +196,29 @@ nav.tabbar button.active{color:var(--blue);border-top:3px solid var(--blue);}
         </p>
       </div>
     </section>
+
+    <section id="panel-admin" class="panel hidden">
+      <div id="admin-login" class="card">
+        <h3>Espace administrateur</h3>
+        <p class="hint" style="text-align:left;">Entrez le mot de passe pour voir tous les paiements, références et numéros reçus.</p>
+        <div class="login-field">
+          <span class="lock-ico">🔒</span>
+          <input id="admin-password" type="password" placeholder="Mot de passe" autocomplete="current-password">
+          <button type="button" id="toggle-pw" class="eye-btn" aria-label="Afficher/masquer le mot de passe">👁️</button>
+        </div>
+        <div id="admin-login-error" class="login-error hidden"></div>
+        <button id="btn-admin-login" class="btn btn-primary">Se connecter</button>
+      </div>
+
+      <div id="admin-dashboard" class="card hidden">
+        <div class="admin-header">
+          <h3 style="margin:0;">Tous les paiements</h3>
+          <button id="btn-admin-logout">Déconnexion</button>
+        </div>
+        <p id="admin-empty" class="hint hidden">Aucun paiement reçu pour l'instant.</p>
+        <div id="admin-list"></div>
+      </div>
+    </section>
   </main>
 
   <div id="photo-overlay">
@@ -205,6 +241,7 @@ nav.tabbar button.active{color:var(--blue);border-top:3px solid var(--blue);}
   <nav class="tabbar">
     <button class="active" data-panel="panel-paiement">💳 Paiement</button>
     <button data-panel="panel-partage">🔗 Partager / QR</button>
+    <button data-panel="panel-admin">🔐 Admin</button>
   </nav>
 </div>
 
@@ -217,39 +254,60 @@ nav.tabbar button.active{color:var(--blue);border-top:3px solid var(--blue);}
 // quand même : les paiements sont gardés sur l'appareil du client
 // (mode local), mais pas encore synchronisés dans le cloud.
 // ============================================================
+// L'espace admin ne demande QUE le mot de passe. En interne, il est
+// associé à cet e-mail fixe (créé une seule fois dans Firebase
+// Authentication) — vous n'aurez jamais à le taper.
+const ADMIN_EMAIL = "admin@shaman-chooz-production.ci";
+
 const firebaseConfig = {
-  apiKey: "REMPLACER_API_KEY",
-  authDomain: "REMPLACER.firebaseapp.com",
-  projectId: "REMPLACER_PROJECT_ID",
-  storageBucket: "REMPLACER.appspot.com",
-  messagingSenderId: "REMPLACER_SENDER_ID",
-  appId: "REMPLACER_APP_ID"
+  apiKey: "AIzaSyBhJ1GloBv-7usXcN0nNx4Jf15kYoHQIy8",
+  authDomain: "pour-paiement-shaman-chooz.firebaseapp.com",
+  databaseURL: "https://pour-paiement-shaman-chooz-default-rtdb.firebaseio.com",
+  projectId: "pour-paiement-shaman-chooz",
+  storageBucket: "pour-paiement-shaman-chooz.firebasestorage.app",
+  messagingSenderId: "853955980041",
+  appId: "1:853955980041:web:f4e5147e7ef06b5080c1d8"
 };
 
 let dbApi = null;
+let authApi = null;
 let firebaseReady = false;
 
+// NOTE SÉCURITÉ : le mot de passe administrateur n'est jamais écrit
+// dans ce fichier. Il est créé et vérifié par le service Firebase
+// Authentication (voir instructions fournies), donc personne ne peut
+// le lire en inspectant le code de la page.
 async function initFirebase() {
   const isPlaceholder = Object.values(firebaseConfig).some(v => String(v).startsWith("REMPLACER"));
   if (isPlaceholder) { console.warn("[SHAMAN] Firebase non configuré : mode local uniquement."); return; }
   try {
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, collection, addDoc, serverTimestamp, enableIndexedDbPersistence } =
-      await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const { getDatabase, ref, push, set, serverTimestamp, onValue, query, orderByChild } =
+      await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js");
+    const { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } =
+      await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    try { await enableIndexedDbPersistence(db); } catch (e) { console.warn("[SHAMAN] Persistance non activée:", e.code); }
-    dbApi = { collection, addDoc, serverTimestamp, db };
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+
+    dbApi = { db, ref, push, set, serverTimestamp, onValue, query, orderByChild };
+    authApi = { auth, signInWithEmailAndPassword, signOut, onAuthStateChanged };
     firebaseReady = true;
+    bindAdminAuth();
   } catch (e) { console.error("[SHAMAN] Erreur Firebase:", e); }
 }
 
 async function enregistrerPaiement(paiement) {
   if (firebaseReady && dbApi) {
     try {
-      await dbApi.addDoc(dbApi.collection(dbApi.db, "paiements"), { ...paiement, createdAt: dbApi.serverTimestamp() });
+      const nouvelleRef = dbApi.push(dbApi.ref(dbApi.db, "paiements"));
+      await dbApi.set(nouvelleRef, { ...paiement, createdAt: dbApi.serverTimestamp() });
       return { ok: true, mode: "firebase" };
     } catch (e) {
+      // La Realtime Database met automatiquement les écritures en
+      // attente si l'appareil est hors-ligne, puis les envoie dès
+      // le retour du réseau.
       console.warn("[SHAMAN] Écriture mise en file (hors-ligne):", e);
       return { ok: true, mode: "firebase-queued" };
     }
@@ -259,6 +317,67 @@ async function enregistrerPaiement(paiement) {
   queue.push({ ...paiement, dateLocale: new Date().toISOString() });
   localStorage.setItem(key, JSON.stringify(queue));
   return { ok: true, mode: "local" };
+}
+
+// ---- Espace administrateur -------------------------------------
+function setupAdminUI() {
+  const pwInput = document.getElementById("admin-password");
+  const toggleBtn = document.getElementById("toggle-pw");
+  toggleBtn.addEventListener("click", () => {
+    const showing = pwInput.type === "text";
+    pwInput.type = showing ? "password" : "text";
+    toggleBtn.textContent = showing ? "👁️" : "🙈";
+  });
+
+  document.getElementById("btn-admin-login").addEventListener("click", async () => {
+    const errBox = document.getElementById("admin-login-error");
+    errBox.classList.add("hidden");
+    if (!firebaseReady) {
+      errBox.textContent = "Firebase n'est pas encore configuré (voir la section configuration du code).";
+      errBox.classList.remove("hidden");
+      return;
+    }
+    const password = pwInput.value;
+    if (!password) { errBox.textContent = "Entrez le mot de passe."; errBox.classList.remove("hidden"); return; }
+    try {
+      await authApi.signInWithEmailAndPassword(authApi.auth, ADMIN_EMAIL, password);
+    } catch (e) {
+      errBox.textContent = "Mot de passe incorrect.";
+      errBox.classList.remove("hidden");
+    }
+  });
+
+  document.getElementById("btn-admin-logout").addEventListener("click", () => {
+    if (firebaseReady) authApi.signOut(authApi.auth);
+  });
+}
+
+function bindAdminAuth() {
+  authApi.onAuthStateChanged(authApi.auth, (user) => {
+    document.getElementById("admin-login").classList.toggle("hidden", !!user);
+    document.getElementById("admin-dashboard").classList.toggle("hidden", !user);
+    if (user) chargerPaiements();
+  });
+}
+
+function chargerPaiements() {
+  const paiementsRef = dbApi.query(dbApi.ref(dbApi.db, "paiements"), dbApi.orderByChild("createdAt"));
+  dbApi.onValue(paiementsRef, (snapshot) => {
+    const liste = document.getElementById("admin-list");
+    const vide = document.getElementById("admin-empty");
+    const items = [];
+    snapshot.forEach((child) => items.push(child.val()));
+    items.reverse();
+    vide.classList.toggle("hidden", items.length > 0);
+    liste.innerHTML = items.map((p) => `
+      <div class="paiement-item">
+        <div class="pi-top"><span>${Number(p.montant || 0).toLocaleString("fr-FR")} F CFA</span><span>${p.operateur || ""}</span></div>
+        <div class="pi-row"><span>Numéro payeur</span><b>${p.numeroPayeur || "--"}</b></div>
+        <div class="pi-row"><span>Référence</span><b>${p.reference || "--"}</b></div>
+        <div class="pi-row"><span>Origine</span><b>${p.origine === "intl" ? "International" : "Côte d'Ivoire"}</b></div>
+        <div class="pi-row"><span>Date</span><b>${p.dateLocale ? new Date(p.dateLocale).toLocaleString("fr-FR") : "--"}</b></div>
+      </div>`).join("");
+  });
 }
 
 // ---- Données de l'agence ----------------------------------
@@ -382,7 +501,7 @@ function setupTabs() {
 }
 
 function init() {
-  setupPhoto(); setupReseau(); setupTabs(); setupPartage();
+  setupPhoto(); setupReseau(); setupTabs(); setupPartage(); setupAdminUI();
   renderOrigine(); renderOperateurs(); setMontant(state.montant); updateSummary();
 
   document.querySelectorAll(".origin-opt").forEach(el => {
